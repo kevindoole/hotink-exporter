@@ -1,5 +1,5 @@
 var options = {
-  "accountId": 17
+  "accountId": 21 // quill
 };
 
 var fs = require("fs");
@@ -93,9 +93,14 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
             if (documents[i].title != null && documents[i].title != "") {
               item.ele("title").txt(documents[i].title);
             }
-            // dc:creator
+
+            // hotink_authors (comma-separated list of authors)
+            var hotinkAuthorsPostmeta = item.ele("wp:postmeta");
+            hotinkAuthorsPostmeta.ele("wp:meta_key").txt("hotink_authors");
             if (authorshipsById[documents[i].id]) {
-              item.ele("dc:creator").txt(authorshipsById[documents[i].id]);
+              hotinkAuthorsPostmeta.ele("wp:meta_value").txt(authorshipsById[documents[i].id]);
+            } else {
+              hotinkAuthorsPostmeta.ele("wp:meta_value")
             }
 
             // link, guid
