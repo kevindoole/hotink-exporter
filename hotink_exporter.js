@@ -70,6 +70,7 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
 
     Accounts.find(options.accountId).on('success', function(account) {
       var channel = rss.ele("channel");
+      channel.ele("wp:wxr_version").txt("1.1");
       channel.ele("title").txt(account.formal_name);
       channel.ele("link").txt(account.site_url);
       channel.ele("language").txt("en-CA");
@@ -97,21 +98,26 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
               item.ele("dc:creator").txt(authorshipsById[documents[i].id]);
             }
 
-            // link
+            // link, guid
             if (account.site_url[account.site_url.length - 1] == "/") {
               item.ele("link").txt(account.site_url + "articles/" + documents[i].id + "/");
+              item.ele("guid").txt(account.site_url + "articles/" + documents[i].id + "/");
             } else {
               item.ele("link").txt(account.site_url + "/articles/" + documents[i].id + "/");
+              item.ele("guid").txt(account.site_url + "/articles/" + documents[i].id + "/");
             }
 
             // wp:status
             if (documents[i].status != null) {
               if (documents[i].status == "Published") {
-                item.ele("wp:status").txt("published");
+                item.ele("wp:status").txt("publish");
               } else if (documents[i].status == "Awaiting attention") {
                 item.ele("wp:status").txt("pending");
               }
             }
+
+            // pubdate (PLACEHOLDER!)
+            item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
 
             // wp:post_date
             if (documents[i].published_at != null) {
@@ -126,15 +132,45 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
               item.ele("wp:post_date_gmt").txt(gmtDate.toDateString());
             }
 
-            // content:encoded
+            // wp:post_type
+            item.ele("wp:post_type").txt("post");
+
+            // wp:post_name (PLACEHOLDER!)
+            item.ele("wp:post_name").txt("test");
+
+            // wp:post_parent
+            item.ele("wp:post_parent").txt("0");
+
+            // wp:menu_order
+            item.ele("wp:menu_order").txt("0");
+
+            // wp:post_password
+            item.ele("wp:post_password");
+
+            // wp:is_sticky
+            item.ele("wp:is_sticky").txt("0");
+
+            // wp:comment_status
+            item.ele("wp:comment_status").txt("closed");
+
+            // wp:ping_status
+            item.ele("wp:ping_status").txt("closed");
+
+            // excerpt:encoded, content:encoded
             if (documents[i].bodytext != null) {
               var bodyText = markdown(documents[i].bodytext).replace(/\u0000/g, "");
+              item.ele("excerpt:encoded").cdata("");
               item.ele("content:encoded").cdata(bodyText);
             }
 
+            // category (PLACEHOLDER!)
+            item.ele("category").att("domain", "category")
+                                .att("nicename", "uncategorized")
+                                .cdata("Uncategorized");
+
             // DEBUG
             if (documents[i].id == 20360) {
-              console.log(dateString);
+              // console.log(dateString);
             }
           } catch(err) {
             console.log(err);
@@ -142,7 +178,7 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
           }
         }
 
-        fs.writeFile("export.xml", builder.toString({ pretty: true }), function(err) {
+        fs.writeFile("export.xml", builder.toString(), function(err) {
           if(err) {
             sys.puts(err);
           } else {
