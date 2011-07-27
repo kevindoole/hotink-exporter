@@ -86,21 +86,27 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
             // wp:post_id
             item.ele("wp:post_id").txt(i);
 
-            // hotink_id
-            item.ele("hotink_id").txt(documents[i].id);
-
             // title
             if (documents[i].title != null && documents[i].title != "") {
               item.ele("title").txt(documents[i].title);
             }
 
-            // hotink_authors (comma-separated list of authors)
+            // meta: hotink_authors (comma-separated list of authors)
             var hotinkAuthorsPostmeta = item.ele("wp:postmeta");
             hotinkAuthorsPostmeta.ele("wp:meta_key").txt("hotink_authors");
             if (authorshipsById[documents[i].id]) {
               hotinkAuthorsPostmeta.ele("wp:meta_value").txt(authorshipsById[documents[i].id]);
             } else {
               hotinkAuthorsPostmeta.ele("wp:meta_value")
+            }
+
+            // meta: hotink_id (old Hot Ink id -- good for 301 redirects to new permalinks and other bridge functionality)
+            var hotinkIdPostmeta = item.ele("wp:postmeta");
+            hotinkIdPostmeta.ele("wp:meta_key").txt("hotink_id");
+            if (documents[i].id) {
+              hotinkIdPostmeta.ele("wp:meta_value").txt(documents[i].id);
+            } else {
+              hotinkIdPostmeta.ele("wp:meta_value")
             }
 
             // link, guid
