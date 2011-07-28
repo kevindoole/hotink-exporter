@@ -1,3 +1,5 @@
 node_modules
 *.xml
 *.xml.gz
+
+.DS_Store
