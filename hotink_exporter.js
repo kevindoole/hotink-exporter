@@ -19,6 +19,11 @@ var timeZoneOffsets = {
   "Pacific Time (US & Canada)": 0
 }
 
+//Creates "slugs" (wordpress url-friendly versions of various stuff)
+var slugitizer = function (string) {
+  return string.replace(/\s/g, "-").replace(/[^a-z\-A-Z0-9\s]/g, "").toLowerCase();
+}
+
 var sequelize = new Sequelize('hotink', 'hotink', 'HDx96NuZCR6Yr9jK3mjYWq8G', {
   host: "localhost",
   port: 3306
@@ -94,9 +99,7 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
               item.ele("title").txt(documents[i].title);
             }
             // dc:creator
-            if (authorshipsById[documents[i].id]) {
-              item.ele("dc:creator").txt(authorshipsById[documents[i].id]);
-            }
+            item.ele("dc:creator").txt("Staff");
 
             // link, guid
             if (account.site_url[account.site_url.length - 1] == "/") {
@@ -115,6 +118,24 @@ Authors.findAll({where: {account_id: options.accountId}}).on('success', function
                 item.ele("wp:status").txt("pending");
               }
             }
+
+
+            // Authors -- added as a taxonomy called "contributors"
+              //It's a bit of a hack, but I've often gone down this road in the past
+              //to allow editors to post articles by volunteers without having to give
+              //them access as users. Essentially, this mimics hotinks lightweight user entities
+            var contributorMeta = item.ele("wp:postmeta");
+            contributorMeta.ele("wp:meta_key")
+            contributorMeta.ele("wp:meta_value")
+
+            //Split up authors so they can be added as individual terms
+            var auths = authorshipsById[documents[i].id].split(", ");
+            for (var authI = 0; authI < auths.length; i++) {
+              item.ele("category").att("domain", "contributor")
+                                  .att("nicename", slugitizer(auths[authI]))
+                                  .cdata(auths[authI]);
+            }
+            
 
             // pubdate (PLACEHOLDER!)
             item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
