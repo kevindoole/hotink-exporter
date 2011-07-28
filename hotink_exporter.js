@@ -136,10 +136,6 @@ Categories.findAll({where: {account_id: options.accountId}}).on('success', funct
               //It's a bit of a hack, but I've often gone down this road in the past
               //to allow editors to post articles by volunteers without having to give
               //them access as users. Essentially, this mimics hotinks lightweight user entities
-            var contributorMeta = item.ele("wp:postmeta");
-            contributorMeta.ele("wp:meta_key")
-            contributorMeta.ele("wp:meta_value")
-
             //Split up authors so they can be added as individual terms
             var auths = authorshipsById[documents[i].id].split(", ");
             for (var authI = 0; authI < auths.length; i++) {
