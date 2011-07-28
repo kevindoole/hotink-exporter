@@ -164,6 +164,13 @@ Categories.findAll({where: {account_id: options.accountId}}).on('success', funct
                   }
                 }
 
+                // section taxonomy
+                if (categoriesById[documents[i].section_id]) {
+                  item.ele("category").att("domain", "section")
+                                      .att("nicename", categoriesById[documents[i].section_id].slug)
+                                      .cdata(categoriesById[documents[i].section_id].name);
+                }
+
                 // pubdate (PLACEHOLDER!)
                 item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
 
