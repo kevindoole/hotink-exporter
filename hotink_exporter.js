@@ -55,6 +55,11 @@ var Categories = sequelize.define('categories', { }, {
 });
 Categories.sync();
 
+var Sortings = sequelize.define('sortings', { }, {
+  freezeTableName: true
+});
+Sortings.sync();
+
 var rss = builder.begin("rss", {version: "1.0", encoding: "utf-8"});
 rss.comment("hotink-exporter v0.1.0");
 rss.att("xmlns:wp", "http://wordpress.org/export/1.0/");
@@ -63,7 +68,9 @@ rss.att("xmlns:content", "http://purl.org/rss/1.0/modules/content/");
 Categories.findAll({where: {account_id: options.accountId}}).on('success', function(categories) {
   // nestedCategories is used later on to generate wp:categories
   var nestedCategories = {};
+  var categoriesById = {};
   for (var i = 0; i < categories.length; i++) {
+    categoriesById[categories[i].id] = categories[i];
     var nestedCategory = {};
     nestedCategory.id = categories[i].id;
     nestedCategory.name = categories[i].name;
@@ -76,169 +83,191 @@ Categories.findAll({where: {account_id: options.accountId}}).on('success', funct
     }
   }
 
-  Authors.findAll({where: {account_id: options.accountId}}).on('success', function(authors) {
-    authorsById = {};
-    for (var i = 0; i < authors.length; i++) {
-      authorsById[authors[i].id] = authors[i];
-    }
-    Authorships.findAll().on("success", function(authorships) {
-      authorshipsById = {};
-      for (var i = 0; i < authorships.length; i++) {
-        if (authorshipsById[authorships[i].document_id] == undefined) {
-          if (authorsById[authorships[i].author_id]) {
-            authorshipsById[authorships[i].document_id] = authorsById[authorships[i].author_id].name;
-          }
-        } else {
-          if (authorsById[authorships[i].author_id]) {
-            authorshipsById[authorships[i].document_id] += ", " +  authorsById[authorships[i].author_id].name;
-          }
-        }
+  // Map categories by document for use later
+  Sortings.findAll().on('success', function(sortings) {
+    documentCategories = {};
+    for (var i = 0; i < sortings.length; i++) {
+      if (documentCategories[sortings[i].document_id] == undefined) {
+        documentCategories[sortings[i].document_id] = [];
       }
+      var category = categoriesById[sortings[i].category_id];
+      if (category != undefined) {
+        documentCategories[sortings[i].document_id].push({
+          name: category.name,
+          slug: category.slug
+        });
+      }
+    }
 
-      Accounts.find(options.accountId).on('success', function(account) {
-        var channel = rss.ele("channel");
-        channel.ele("wp:wxr_version").txt("1.1");
-        channel.ele("title").txt(account.formal_name);
-        channel.ele("link").txt(account.site_url);
-        channel.ele("language").txt("en-CA");
-        channel.ele("generator").txt("http://hotink.net/");
-        channel.ele("wp:base_site_url").txt(account.site_url);
-        channel.ele("wp:base_blog_url").txt(account.site_url);
-
-        // Categories (wp:category)
-        for (categoryId in nestedCategories) {
-          if (nestedCategories.hasOwnProperty(categoryId)) {
-            var category = nestedCategories[categoryId];
-            createCategory(channel, category, undefined);
-            if (category.children) {
-              for (childCategoryId in category.children) {
-                createCategory(channel, category.children[childCategoryId], category);
-              }
+    Authors.findAll({where: {account_id: options.accountId}}).on('success', function(authors) {
+      authorsById = {};
+      for (var i = 0; i < authors.length; i++) {
+        authorsById[authors[i].id] = authors[i];
+      }
+      Authorships.findAll().on("success", function(authorships) {
+        authorshipsById = {};
+        for (var i = 0; i < authorships.length; i++) {
+          if (authorshipsById[authorships[i].document_id] == undefined) {
+            if (authorsById[authorships[i].author_id]) {
+              authorshipsById[authorships[i].document_id] = authorsById[authorships[i].author_id].name;
+            }
+          } else {
+            if (authorsById[authorships[i].author_id]) {
+              authorshipsById[authorships[i].document_id] += ", " +  authorsById[authorships[i].author_id].name;
             }
           }
         }
 
-        Documents.findAll({where: {account_id: options.accountId}}).on('success', function(documents) {
-          for (var i = 0; i < documents.length; i++) {
-            try {
-              var item = channel.ele("item");
+        Accounts.find(options.accountId).on('success', function(account) {
+          var channel = rss.ele("channel");
+          channel.ele("wp:wxr_version").txt("1.1");
+          channel.ele("title").txt(account.formal_name);
+          channel.ele("link").txt(account.site_url);
+          channel.ele("language").txt("en-CA");
+          channel.ele("generator").txt("http://hotink.net/");
+          channel.ele("wp:base_site_url").txt(account.site_url);
+          channel.ele("wp:base_blog_url").txt(account.site_url);
 
-              // wp:post_id
-              item.ele("wp:post_id").txt(i);
-
-              // title
-              if (documents[i].title != null && documents[i].title != "") {
-                item.ele("title").txt(documents[i].title);
-              }
-
-              // contributor taxonomy (@kevindoole)
-              if (authorshipsById[documents[i].id]) {
-                var authorsList = authorshipsById[documents[i].id].split(", ");
-                for (var authIndex = 0; authIndex < authorsList.length; authIndex++) {
-                  item.ele("category").att("domain", "contributor")
-                                      .att("nicename", slugitizer(authorsList[authIndex]))
-                                      .cdata(authorsList[authIndex]);
+          // Categories (wp:category)
+          for (categoryId in nestedCategories) {
+            if (nestedCategories.hasOwnProperty(categoryId)) {
+              var category = nestedCategories[categoryId];
+              createCategory(channel, category, undefined);
+              if (category.children) {
+                for (childCategoryId in category.children) {
+                  createCategory(channel, category.children[childCategoryId], category);
                 }
               }
-
-              // pubdate (PLACEHOLDER!)
-              item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
-
-              // meta: hotink_id (old Hot Ink id -- good for 301 redirects to new permalinks and other bridge functionality)
-              var hotinkIdPostmeta = item.ele("wp:postmeta");
-              hotinkIdPostmeta.ele("wp:meta_key").txt("hotink_id");
-              if (documents[i].id) {
-                hotinkIdPostmeta.ele("wp:meta_value").txt(documents[i].id);
-              } else {
-                hotinkIdPostmeta.ele("wp:meta_value")
-              }
-
-              // link, guid
-              if (account.site_url[account.site_url.length - 1] == "/") {
-                item.ele("link").txt(account.site_url + "articles/" + documents[i].id + "/");
-                item.ele("guid").txt(account.site_url + "articles/" + documents[i].id + "/");
-              } else {
-                item.ele("link").txt(account.site_url + "/articles/" + documents[i].id + "/");
-                item.ele("guid").txt(account.site_url + "/articles/" + documents[i].id + "/");
-              }
-
-              // wp:status
-              if (documents[i].status != null) {
-                if (documents[i].status == "Published") {
-                  item.ele("wp:status").txt("publish");
-                } else if (documents[i].status == "Awaiting attention") {
-                  item.ele("wp:status").txt("pending");
-                }
-              }
-
-              // pubdate (PLACEHOLDER!)
-              // item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
-
-              // wp:post_date
-              if (documents[i].published_at != null) {
-                var date = documents[i].published_at;
-                date = new Date(date.getTime() + ((timeZoneOffsets[account.time_zone] + date.getDSTOffset()) * 60 * 60 * 1000));
-                item.ele("wp:post_date").txt(date.toDateString());
-              }
-
-              // wp:post_date_gmt
-              if (documents[i].published_at != null) {
-                gmtDate = new Date(date.getTime() + (8 + timeZoneOffsets[account.time_zone] - date.getDSTOffset()) * 60 * 60 * 1000);
-                item.ele("wp:post_date_gmt").txt(gmtDate.toDateString());
-              }
-
-              // wp:post_type
-              item.ele("wp:post_type").txt("post");
-
-              // wp:post_name (PLACEHOLDER!)
-              item.ele("wp:post_name").txt("test");
-
-              // wp:post_parent
-              item.ele("wp:post_parent").txt("0");
-
-              // wp:menu_order
-              item.ele("wp:menu_order").txt("0");
-
-              // wp:post_password
-              item.ele("wp:post_password");
-
-              // wp:is_sticky
-              item.ele("wp:is_sticky").txt("0");
-
-              // wp:comment_status
-              item.ele("wp:comment_status").txt("closed");
-
-              // wp:ping_status
-              item.ele("wp:ping_status").txt("closed");
-
-              // excerpt:encoded, content:encoded
-              if (documents[i].bodytext != null) {
-                var bodyText = markdown(documents[i].bodytext).replace(/\u0000/g, "");
-                item.ele("excerpt:encoded").cdata("");
-                item.ele("content:encoded").cdata(bodyText);
-              }
-
-              // category (PLACEHOLDER!)
-              item.ele("category").att("domain", "category")
-                                  .att("nicename", "uncategorized")
-                                  .cdata("Uncategorized");
-
-              // DEBUG
-              if (documents[i].id == 20360) {
-                // console.log(dateString);
-              }
-            } catch(err) {
-              console.log(err);
-              // console.log(documents[i]);
             }
           }
 
-          fs.writeFile("export.xml", builder.toString(), function(err) {
-            if(err) {
-              sys.puts(err);
-            } else {
-              sys.puts("The file was saved!");
+          Documents.findAll({where: {account_id: options.accountId}}).on('success', function(documents) {
+            for (var i = 0; i < documents.length; i++) {
+              try {
+                var item = channel.ele("item");
+
+                // wp:post_id
+                item.ele("wp:post_id").txt(i);
+
+                // title
+                if (documents[i].title != null && documents[i].title != "") {
+                  item.ele("title").txt(documents[i].title);
+                }
+
+                // contributor taxonomy (@kevindoole)
+                if (authorshipsById[documents[i].id]) {
+                  var authorsList = authorshipsById[documents[i].id].split(", ");
+                  for (var authIndex = 0; authIndex < authorsList.length; authIndex++) {
+                    item.ele("category").att("domain", "contributor")
+                                        .att("nicename", slugitizer(authorsList[authIndex]))
+                                        .cdata(authorsList[authIndex]);
+                  }
+                }
+
+                // pubdate (PLACEHOLDER!)
+                item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
+
+                // meta: hotink_id (old Hot Ink id -- good for 301 redirects to new permalinks and other bridge functionality)
+                var hotinkIdPostmeta = item.ele("wp:postmeta");
+                hotinkIdPostmeta.ele("wp:meta_key").txt("hotink_id");
+                if (documents[i].id) {
+                  hotinkIdPostmeta.ele("wp:meta_value").txt(documents[i].id);
+                } else {
+                  hotinkIdPostmeta.ele("wp:meta_value")
+                }
+
+                // link, guid
+                if (account.site_url[account.site_url.length - 1] == "/") {
+                  item.ele("link").txt(account.site_url + "articles/" + documents[i].id + "/");
+                  item.ele("guid").txt(account.site_url + "articles/" + documents[i].id + "/");
+                } else {
+                  item.ele("link").txt(account.site_url + "/articles/" + documents[i].id + "/");
+                  item.ele("guid").txt(account.site_url + "/articles/" + documents[i].id + "/");
+                }
+
+                // wp:status
+                if (documents[i].status != null) {
+                  if (documents[i].status == "Published") {
+                    item.ele("wp:status").txt("publish");
+                  } else if (documents[i].status == "Awaiting attention") {
+                    item.ele("wp:status").txt("pending");
+                  }
+                }
+
+                // pubdate (PLACEHOLDER!)
+                // item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
+
+                // wp:post_date
+                if (documents[i].published_at != null) {
+                  var date = documents[i].published_at;
+                  date = new Date(date.getTime() + ((timeZoneOffsets[account.time_zone] + date.getDSTOffset()) * 60 * 60 * 1000));
+                  item.ele("wp:post_date").txt(date.toDateString());
+                }
+
+                // wp:post_date_gmt
+                if (documents[i].published_at != null) {
+                  gmtDate = new Date(date.getTime() + (8 + timeZoneOffsets[account.time_zone] - date.getDSTOffset()) * 60 * 60 * 1000);
+                  item.ele("wp:post_date_gmt").txt(gmtDate.toDateString());
+                }
+
+                // wp:post_type
+                item.ele("wp:post_type").txt("post");
+
+                // wp:post_name (PLACEHOLDER!)
+                item.ele("wp:post_name").txt("test");
+
+                // wp:post_parent
+                item.ele("wp:post_parent").txt("0");
+
+                // wp:menu_order
+                item.ele("wp:menu_order").txt("0");
+
+                // wp:post_password
+                item.ele("wp:post_password");
+
+                // wp:is_sticky
+                item.ele("wp:is_sticky").txt("0");
+
+                // wp:comment_status
+                item.ele("wp:comment_status").txt("closed");
+
+                // wp:ping_status
+                item.ele("wp:ping_status").txt("closed");
+
+                // excerpt:encoded, content:encoded
+                if (documents[i].bodytext != null) {
+                  var bodyText = markdown(documents[i].bodytext).replace(/\u0000/g, "");
+                  item.ele("excerpt:encoded").cdata("");
+                  item.ele("content:encoded").cdata(bodyText);
+                }
+
+                // category
+                if (documentCategories[documents[i].id]) {
+                  for (var categoryIndex = 0; categoryIndex < documentCategories[documents[i].id].length; categoryIndex++) {
+                    var category = documentCategories[documents[i].id][categoryIndex];
+                    item.ele("category").att("domain", "category")
+                                        .att("nicename", category.slug)
+                                        .cdata(category.name);
+                  }
+                }
+
+                // DEBUG
+                if (documents[i].id == 20360) {
+                  // console.log(dateString);
+                }
+              } catch(err) {
+                console.log(err);
+                // console.log(documents[i]);
+              }
             }
+
+            fs.writeFile("export.xml", builder.toString(), function(err) {
+              if(err) {
+                sys.puts(err);
+              } else {
+                sys.puts("The file was saved!");
+              }
+            });
           });
         });
       });
