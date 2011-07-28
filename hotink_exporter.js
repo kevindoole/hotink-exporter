@@ -131,22 +131,18 @@ Categories.findAll({where: {account_id: options.accountId}}).on('success', funct
                 item.ele("title").txt(documents[i].title);
               }
 
+              // contributor taxonomy (@kevindoole)
+              if (authorshipsById[documents[i].id]) {
+                var authorsList = authorshipsById[documents[i].id].split(", ");
+                for (var authIndex = 0; authIndex < authorsList.length; authIndex++) {
+                  item.ele("category").att("domain", "contributor")
+                                      .att("nicename", slugitizer(authorsList[authIndex]))
+                                      .cdata(authorsList[authIndex]);
+                }
+              }
 
-            // Authors -- added as a taxonomy called "contributors"
-              //It's a bit of a hack, but I've often gone down this road in the past
-              //to allow editors to post articles by volunteers without having to give
-              //them access as users. Essentially, this mimics hotinks lightweight user entities
-            //Split up authors so they can be added as individual terms
-            var auths = authorshipsById[documents[i].id].split(", ");
-            for (var authI = 0; authI < auths.length; i++) {
-              item.ele("category").att("domain", "contributor")
-                                  .att("nicename", slugitizer(auths[authI]))
-                                  .cdata(auths[authI]);
-            }
-            
-
-            // pubdate (PLACEHOLDER!)
-            item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
+              // pubdate (PLACEHOLDER!)
+              item.ele("pubdate").txt("Tue, 26 Jul 2011 18:01:24 +0000");
 
               // meta: hotink_id (old Hot Ink id -- good for 301 redirects to new permalinks and other bridge functionality)
               var hotinkIdPostmeta = item.ele("wp:postmeta");
