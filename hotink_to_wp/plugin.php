@@ -25,7 +25,7 @@ function HITWP_make_tax_labels($name, $plural = true) {
 }
 
 function HITWP_create_taxonomies () {
-    register_taxonomy('contributor',array('post'), array(
+    register_taxonomy('contributor',array('post', 'blog'), array(
         'hierarchical' => false,
         'labels' => HITWP_make_tax_labels('Contributors'),
         'show_ui' => true,
@@ -42,6 +42,42 @@ function HITWP_create_taxonomies () {
     
 }
 add_action( 'init', 'HITWP_create_taxonomies', 0 );
+
+
+
+function HITWP_create_post_types() {
+	$labels = array(
+		'name' => _x('Blog', 'post type general name'),
+		'singular_name' => _x('Blog entry', 'post type singular name'),
+		'search_items' => _x('Search', 'blog'),
+		'all_items' => __('All blog entries'),
+		'parent_item' => __('Parent entry'),
+		'parent_item_colon' => __( 'Parent : entry'),
+		'edit_item' => __( 'Edit entry' ), 
+		'update_item' => __( 'Update entry' ),
+		'add_new_item' => __( 'Add new entry' ),
+		'new_item_name' => __( 'New entry name' ),
+		'menu_name' => __( 'Blog' ),
+	);
+	
+	
+	register_post_type( 'blog' , array(
+		'labels' => $labels,
+		'public' => true,
+		'show_ui' => true,
+		'capability_type' => 'post',
+		'taxonomies' => array('category', 'post_tag', 'contributor'),
+		'hierarchical' => false,
+		'rewrite' => true,
+		'has_archive' => true,
+		'supports' => array('post-formats', 'title', 'editor', 'excerpt', 'thumbnail', 'author', 'trackbacks', 'comments')
+		)
+		);
+}
+add_action( 'init', 'HITWP_create_post_types', 0 );
+
+
+
 
 function HITWP_change_post_menu_label() {
 	global $menu;
